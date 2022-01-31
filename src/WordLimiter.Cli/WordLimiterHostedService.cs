@@ -1,75 +1,99 @@
+using Newtonsoft.Json;
+using MediatR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System.Text;
-using WordLimiter.Core;
-using WordLimiter.Core.Entities;
+using System.Diagnostics;
+using WordLimiter.Cli.ArgumentOptions;
+using WordLimiter.Core.UseCases;
+using WordLimiter.Core.Exceptions;
 
 namespace WordLimiter;
 
 internal class WordLimiterHostedService
-    : IHostedService
+    : BackgroundService
 {
+    private readonly DefaultArgs _args;
     private readonly ILogger _logger;
-    private readonly IWordLimiter _wordLimiter;
+    private readonly IMediator _mediator;
     private readonly IHostApplicationLifetime _application;
 
     public WordLimiterHostedService(
+        DefaultArgs args,
         ILogger<WordLimiterHostedService> logger,
-        IWordLimiter wordLimiter,
+        IMediator mediator,
         IHostApplicationLifetime application)
     {
+        _args = args;
         _logger = logger;
-        _wordLimiter = wordLimiter;
+        _mediator = mediator;
         _application = application;
     }
-
-    public Task StartAsync(CancellationToken cancellationToken)
+    
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var doSomethingTask = BackgroundWorker();
-        return Task.CompletedTask;
+        try
+        {
+            var request = new GetWordSuggestionsUseCase.Request
+            {
+                WordLength = _args.Length,
+                Guesses = _args
+                    .Guesses
+                    .Select(guess => StringToGuess(_args.Length, guess))
+                    .ToList(),
+            };
+
+            var response = await _mediator.Send(request, stoppingToken);
+            var json = JsonConvert.SerializeObject(response, Formatting.Indented);
+            _logger.LogInformation(json);
+        }
+        catch(InvalidRequestException ex)
+        {
+            var json = JsonConvert.SerializeObject(ex, Formatting.Indented);
+            _logger.LogWarning(json);
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(ex, "There was an unexpected exception:");
+        }
+        finally
+        {
+            _application.StopApplication();
+        }
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    private static GetWordSuggestionsUseCase.Request.GuessDto StringToGuess(int length, string input)
     {
-        return Task.CompletedTask;
+        Debug.Assert(input.Length == length * 2 + 1);
+
+        var split = input.Split(new char[] { ' ' });
+        var guessLetters = new List<GetWordSuggestionsUseCase.Request.GuessDto.GuessLetterDto>();
+        for(var i = 0; i < length; i++)
+        {
+            guessLetters.Add(new GetWordSuggestionsUseCase.Request.GuessDto.GuessLetterDto
+            {
+                Index = i,
+                Letter = split[0][i],
+                Status = GetStatusFromChar(split[1][i]),
+            });
+        }
+        return new GetWordSuggestionsUseCase.Request.GuessDto
+        {
+            GuessLetters = guessLetters,
+        };
     }
 
-    public Task BackgroundWorker()
+    private static GetWordSuggestionsUseCase.Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum GetStatusFromChar(char c)
     {
-        var guesses = new List<Guess>();
-        var words = string.Empty;
-
-        guesses.Add(new Guess(new GuessLetter[]{
-            new GuessLetter(0, 'l', GuessLetterStatus.Invalid),
-            new GuessLetter(1, 'o', GuessLetterStatus.Invalid),
-            new GuessLetter(2, 's', GuessLetterStatus.Invalid),
-            new GuessLetter(3, 'e', GuessLetterStatus.Invalid),
-            new GuessLetter(4, 'r', GuessLetterStatus.Invalid),
-        }));
-
-        guesses.Add(new Guess(new GuessLetter[]{
-            new GuessLetter(0, 'q', GuessLetterStatus.Invalid),
-            new GuessLetter(1, 'u', GuessLetterStatus.Invalid),
-            new GuessLetter(2, 'i', GuessLetterStatus.Invalid),
-            new GuessLetter(3, 'c', GuessLetterStatus.Invalid),
-            new GuessLetter(4, 'k', GuessLetterStatus.Invalid),
-        }));
-
-        words = Guess(new Input(5, guesses));
-        _logger.LogInformation($"Guess {guesses.Count}:\n{words}");
-
-        _application.StopApplication();
-        return Task.CompletedTask;
-    }
-
-    private string Guess(Input input)
-    {
-        var output = _wordLimiter.SuggestWords(input);
-
-        var stringBuilder = new StringBuilder();
-        foreach(var word in output.WordSuggestions)
-            stringBuilder.AppendLine($"- {word}");
-
-        return stringBuilder.ToString();
+        switch(c)
+        {
+            case '.':
+                return GetWordSuggestionsUseCase.Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Wrong;
+            case '?':
+                return GetWordSuggestionsUseCase.Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Misplaced;
+            case '!':
+                return GetWordSuggestionsUseCase.Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Correct;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(c));
+        }
     }
 }
