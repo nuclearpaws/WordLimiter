@@ -2,6 +2,7 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using WordLimiter.Core.Behaviours;
+using WordLimiter.Core.Services;
 using System.Reflection;
 
 namespace WordLimiter.Core;
@@ -12,6 +13,8 @@ public static class _DependencyRegister
     {
         var assembly = Assembly.GetAssembly(typeof(_DependencyRegister)) ?? throw new Exception("This should literally not happen....");
 
+        services.AddSingleton<IWordLimiterService, WordLimiterService>();
+        
         services.AddValidatorsFromAssembly(assembly);
         services.AddMediatR(assembly);
 
