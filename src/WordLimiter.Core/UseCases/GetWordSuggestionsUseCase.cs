@@ -1,6 +1,8 @@
 using FluentValidation;
 using MediatR;
 using WordLimiter.Core.Dependencies;
+using WordLimiter.Core.Entities;
+using WordLimiter.Core.Services;
 
 namespace WordLimiter.Core.UseCases;
 
@@ -10,10 +12,14 @@ public sealed class GetWordSuggestionsUseCase
         GetWordSuggestionsUseCase.Response>
 {
     private readonly IWordRepository _wordRepository;
+    private readonly IWordLimiterService _wordLimiterService;
 
-    public GetWordSuggestionsUseCase(IWordRepository wordRepository)
+    public GetWordSuggestionsUseCase(
+        IWordRepository wordRepository,
+        IWordLimiterService wordLimiterService)
     {
         _wordRepository = wordRepository;
+        _wordLimiterService = wordLimiterService;
     }
 
     public async Task<Response> Handle(
@@ -23,8 +29,11 @@ public sealed class GetWordSuggestionsUseCase
         var words = await _wordRepository
             .GetWordsAsync(request.WordLength, cancellationToken);
 
-        foreach(var guess in request.Guesses)
-            words = LimitWordsByGuess(words, guess);
+        var letterSpecifications = GetLetterSpecificationsFromRequest(request);
+        words = _wordLimiterService.LimitWords(words, letterSpecifications);
+
+        // foreach(var guess in request.Guesses)
+        //     words = LimitWordsByGuess(words, guess);
 
         var response = new Response
         {
@@ -35,127 +44,46 @@ public sealed class GetWordSuggestionsUseCase
         return response;
     }
 
-    private IEnumerable<string> LimitWordsByGuess(IEnumerable<string> words, Request.GuessDto guess)
+    private static IEnumerable<LetterSpecification> GetLetterSpecificationsFromRequest(Request request)
     {
-        var lettersToInclude = guess
-            .GuessLetters
-            .Where(gl => gl.Status == Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Correct || gl.Status == Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Misplaced)
-            .Select(gl => gl.Letter);
-        words = KeepWordsContainingLetters(words, lettersToInclude);
+        var letterSpecifications = LetterSpecification.GetAllAllowed(request.WordLength);
 
-        var lettersToExclude = guess
-            .GuessLetters
-            .Where(gl => gl.Status == Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Wrong)
-            .Select(gl => gl.Letter)
-            .Where(c => !lettersToInclude.Contains(c)); // Exclude letters to include
-        words = RemoveWordsContainingLetters(words, lettersToExclude);
+        foreach(var guess in request.Guesses)
+            letterSpecifications = LimitLetterSpecificationsByGuess(letterSpecifications, guess);
 
-        var lettersToIncludeAtIndex = guess
-            .GuessLetters
-            .Where(gl => gl.Status == Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Correct)
-            .Select(gl => (gl.Index, gl.Letter));
-        words = KeepWordsContainingLettersAtIndex(words, lettersToIncludeAtIndex);
-
-        var lettersToExcludeAtIndex = guess
-            .GuessLetters
-            .Where(gl => gl.Status == Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Wrong)
-            .Select(gl => (gl.Index, gl.Letter));
-        words = RemoveWordsContainingLettersAtIndex(words, lettersToExcludeAtIndex);
-
-        return words;
+        return letterSpecifications;
     }
 
-    private IEnumerable<string> KeepWordsContainingLetters(IEnumerable<string> words, IEnumerable<char> letters)
+    private static IEnumerable<LetterSpecification> LimitLetterSpecificationsByGuess(IEnumerable<LetterSpecification> letterSpecifications, Request.GuessDto guess)
     {
-        var validWords = new List<string>();
-
-        foreach(var word in words)
+        foreach(var guessLetter in guess.GuessLetters)
         {
-            var wordChars = new List<char>(word);
-            var lettersRemaining = new List<char>(letters);
-
-            foreach(var letter in letters)
-            {
-                if(wordChars.Contains(letter))
-                {
-                    wordChars.Remove(letter);
-                    lettersRemaining.Remove(letter);
-                }
-            }
-
-            if(lettersRemaining.Count == 0)
-                validWords.Add(word);
-        }
-
-        return validWords;
-    }
-
-    private IEnumerable<string> RemoveWordsContainingLetters(IEnumerable<string> words, IEnumerable<char> letters)
-    {
-        words = words.Distinct(); // Limit redundancy
-
-        var validWords = new List<string>();
-        foreach(var word in words)
-        {
-            var wordValid = true;
-            foreach(var letter in letters)
-            {
-                if(word.Contains(letter))
-                {
-                    wordValid = false;
-                    break;
-                }
-            }
-
-            if(wordValid)
-                validWords.Add(word);
-        }
-        return validWords;
-    }
-
-    private IEnumerable<string> KeepWordsContainingLettersAtIndex(IEnumerable<string> words, IEnumerable<(int, char)> lettersWithIndex)
-    {
-        var validWords = new List<string>();
-
-        foreach(var word in words)
-        {
-            var letterAtIndexMatch = 0;
+            var letterSpecification = letterSpecifications.FirstOrDefault(ls => ls.Letter == guessLetter.Letter);
             
-            foreach(var letterWithIndex in lettersWithIndex)
+            if(letterSpecification == null)
+                continue;
+            
+            switch(guessLetter.Status)
             {
-                if(word[letterWithIndex.Item1] == letterWithIndex.Item2)
-                    letterAtIndexMatch++;
-            }
-
-            if(letterAtIndexMatch == lettersWithIndex.Count())
-                validWords.Add(word);
-        }
-
-        return validWords;
-    }
-
-    private IEnumerable<string> RemoveWordsContainingLettersAtIndex(IEnumerable<string> words, IEnumerable<(int, char)> lettersWithIndex)
-    {
-        var validWords = new List<string>();
-
-        foreach(var word in words)
-        {
-            var wordValid = true;
-
-            foreach(var letterWithIndex in lettersWithIndex)
-            {
-                if(word[letterWithIndex.Item1] == letterWithIndex.Item2)
-                {
-                    wordValid = false;
+                case Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Correct:
+                    var newRequiredIndecies = new List<int>(letterSpecification.RequiredIndecies);
+                    newRequiredIndecies.Add(guessLetter.Index);
+                    letterSpecification.RequiredIndecies = newRequiredIndecies;
                     break;
-                }
+                case Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Misplaced:
+                    var newAllowedIndecies = new List<int>(letterSpecification.AllowedIndecies);
+                    newAllowedIndecies.Remove(guessLetter.Index);
+                    letterSpecification.AllowedIndecies = newAllowedIndecies;
+                    break;
+                case Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Wrong:
+                    letterSpecification.AllowedIndecies = letterSpecification.RequiredIndecies;
+                    break;
+                default:
+                    break;
             }
-
-            if(wordValid)
-                validWords.Add(word);
         }
 
-        return validWords;
+        return letterSpecifications;
     }
 
     public sealed class Validator
