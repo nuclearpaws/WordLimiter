@@ -10,8 +10,11 @@ public record LetterSpecification
         get => _requiredIndecies;
         set
         {
+            value = value.Distinct();
+
             if(value.Except(_allowedIndecies).Any())
                 throw new InvalidOperationException($"'{nameof(RequiredIndecies)}' must be contained within '{nameof(AllowedIndecies)}'.");
+
             _requiredIndecies = value;
         }
     }
@@ -22,8 +25,11 @@ public record LetterSpecification
         get => _allowedIndecies;
         set
         {
+            value = value.Distinct();
+
             if(_requiredIndecies.Except(value).Any())
                 throw new InvalidOperationException($"'{nameof(AllowedIndecies)}' must contain all values from '{nameof(RequiredIndecies)}'.");
+
             _allowedIndecies = value;
         }
     }

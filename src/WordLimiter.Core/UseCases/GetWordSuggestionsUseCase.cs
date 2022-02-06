@@ -32,9 +32,6 @@ public sealed class GetWordSuggestionsUseCase
         var letterSpecifications = GetLetterSpecificationsFromRequest(request);
         words = _wordLimiterService.LimitWords(words, letterSpecifications);
 
-        // foreach(var guess in request.Guesses)
-        //     words = LimitWordsByGuess(words, guess);
-
         var response = new Response
         {
             GuessCount = request.Guesses.Count(),
