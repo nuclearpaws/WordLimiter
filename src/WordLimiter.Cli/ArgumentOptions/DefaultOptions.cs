@@ -10,8 +10,12 @@ internal sealed class DefaultArgs
     [Option('g', "guess", Required = false, HelpText = "The Wordle like guess represented like \"<word> <feedback>\" where word is the word guess and feedback is \".\" for invalid letter, \"?\" for misplaced letter and \"!\" for correctly guessed letter. Multiples are accepted.")]
     public IEnumerable<string> Guesses { get; set; }
 
+    [Option('o', "output", Required = false, HelpText = "File Path to which the output of this will be written instead of console.")]
+    public string OutputFile { get; set; }
+
     public DefaultArgs()
     {
         Guesses = new List<string>();
+        OutputFile = string.Empty;
     }
 }

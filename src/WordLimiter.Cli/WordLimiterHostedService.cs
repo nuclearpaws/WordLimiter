@@ -6,6 +6,7 @@ using System.Diagnostics;
 using WordLimiter.Cli.ArgumentOptions;
 using WordLimiter.Core.UseCases;
 using WordLimiter.Core.Exceptions;
+using WordLimiter.Cli.Helpers;
 
 namespace WordLimiter;
 
@@ -44,7 +45,17 @@ internal class WordLimiterHostedService
 
             var response = await _mediator.Send(request, stoppingToken);
             var json = JsonConvert.SerializeObject(response, Formatting.Indented);
-            _logger.LogInformation(json);
+
+            if(string.IsNullOrWhiteSpace(_args.OutputFile))
+            {
+                _logger.LogInformation(json);
+            }
+            else
+            {
+                var outputFilePath = $"./{_args.OutputFile}.json";
+                FileWriter.WriteFile(outputFilePath, json);
+                _logger.LogInformation(outputFilePath);
+            }
         }
         catch(InvalidRequestException ex)
         {
