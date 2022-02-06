@@ -1,3 +1,5 @@
+using WordLimiter.Core.Helpers;
+
 namespace WordLimiter.Core.Entities;
 
 public record LetterSpecification
@@ -52,12 +54,8 @@ public record LetterSpecification
 
     public static IEnumerable<LetterSpecification> GetAllAllowed(int wordLength)
     {
-        var letters = Enumerable
-            .Range((int)'a', 26)
-            .Select(i => (char)i)
-            .ToList();
-
-        var letterSpecifications = letters
+        var letterSpecifications = LetterHelper
+            .GetAllAToZLowerLetters()
             .Select(c => new LetterSpecification
             {
                 Letter = c,

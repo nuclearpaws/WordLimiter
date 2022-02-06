@@ -13,13 +13,16 @@ public sealed class GetWordSuggestionsUseCase
 {
     private readonly IWordRepository _wordRepository;
     private readonly IWordLimiterService _wordLimiterService;
+    private readonly IWordScoreService _wordScoreService;
 
     public GetWordSuggestionsUseCase(
         IWordRepository wordRepository,
-        IWordLimiterService wordLimiterService)
+        IWordLimiterService wordLimiterService,
+        IWordScoreService wordScoreService)
     {
         _wordRepository = wordRepository;
         _wordLimiterService = wordLimiterService;
+        _wordScoreService = wordScoreService;
     }
 
     public async Task<Response> Handle(
@@ -36,7 +39,14 @@ public sealed class GetWordSuggestionsUseCase
         {
             GuessCount = request.Guesses.Count(),
             SuggestionCount = words.Count(),
-            Suggestions = words,
+            Suggestions = words
+                .Select(word => new Response.SuggestionDto
+                {
+                    Word = word,
+                    Score = _wordScoreService.ScoreWord(word),
+                })
+                .OrderByDescending(s => s.Score)
+                .ToList(),
         };
         return response;
     }
@@ -164,11 +174,22 @@ public sealed class GetWordSuggestionsUseCase
     {
         public int GuessCount { get; set; }
         public int SuggestionCount { get; set; }
-        public IEnumerable<string> Suggestions { get; set; }
+        public IEnumerable<SuggestionDto> Suggestions { get; set; }
 
         public Response()
         {
-            Suggestions = new List<string>();
+            Suggestions = new List<SuggestionDto>();
+        }
+
+        public sealed class SuggestionDto
+        {
+            public string Word { get; set; }
+            public int Score { get; set; }
+
+            public SuggestionDto()
+            {
+                Word = string.Empty;
+            }
         }
     }
 }

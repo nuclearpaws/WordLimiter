@@ -14,6 +14,7 @@ public static class _DependencyRegister
         var assembly = Assembly.GetAssembly(typeof(_DependencyRegister)) ?? throw new Exception("This should literally not happen....");
 
         services.AddSingleton<IWordLimiterService, WordLimiterService>();
+        services.AddSingleton<IWordScoreService, WordScoreService>();
         
         services.AddValidatorsFromAssembly(assembly);
         services.AddMediatR(assembly);
