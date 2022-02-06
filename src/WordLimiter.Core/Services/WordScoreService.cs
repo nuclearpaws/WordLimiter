@@ -12,45 +12,59 @@ public class WordScoreService
     private readonly IEnumerable<char> _commonLetters;
     private readonly IEnumerable<char> _commonFirstLetters;
     private readonly IEnumerable<char> _commonLastLetters;
+    private readonly int _vowelScore;
+    private readonly int _commonLetterScore;
+    private readonly int _commonFirstLetterScore;
+    private readonly int _commonLastLetterScore;
+    private readonly int _duplicateLetterScore;
 
-    public WordScoreService()
+    public WordScoreService(
+        IEnumerable<char> vowels,
+        IEnumerable<char> commonLetters,
+        IEnumerable<char> commonFirstLetters,
+        IEnumerable<char> commonLastLetters,
+        int vowelScore,
+        int commonLetterScore,
+        int commonFirstLetterScore,
+        int commonLastLetterScore,
+        int duplicateLetterScore
+    )
     {
-        _vowels = new char[] { 'a', 'e', 'i', 'o', 'u', 'y' };
-        _commonLetters = new char[] { 'e', 't', 'a', 'i', 'o', 'n', 's', 'h', 'r' };
-        _commonFirstLetters = new char[] { 't', 'a', 'o', 'd', 'w' };
-        _commonLastLetters = new char[] { 'e', 's', 'd', 't' };
+        _vowels = vowels;
+        _commonLetters = commonLetters;
+        _commonFirstLetters = commonFirstLetters;
+        _commonLastLetters = commonLastLetters;
+        _vowelScore = vowelScore;
+        _commonLetterScore = commonLetterScore;
+        _commonFirstLetterScore = commonFirstLetterScore;
+        _commonLastLetterScore = commonLastLetterScore;
+        _duplicateLetterScore = duplicateLetterScore;
     }
 
     public int ScoreWord(string word)
     {
-        const int vowelScore = 3;
-        const int commonLetterScore = 5;
-        const int commonFirstLetterScore = 7;
-        const int commonLastLetterScore = 7;
-        const int duplicateLetterScore = -10;
-
         var score = 0;
 
         // Vowels:
-        score += word.Count(c => _vowels.Contains(c)) * vowelScore;
+        score += word.Count(c => _vowels.Contains(c)) * _vowelScore;
         
         // Common Letters:
-        score += word.Count(c => _commonLetters.Contains(c)) * commonLetterScore;
+        score += word.Count(c => _commonLetters.Contains(c)) * _commonLetterScore;
         
         // Common First Letters:
         if(_commonFirstLetters.Contains(word.First()))
-            score += commonFirstLetterScore;
+            score += _commonFirstLetterScore;
         
         // Common Last Letters:
         if(_commonLastLetters.Contains(word.Last()))
-            score += commonLastLetterScore;
+            score += _commonLastLetterScore;
 
         // Duplicates:
         var duplicates = word
             .GroupBy(c => c)
             .Count(gbr => gbr.Count() > 1);
         if(duplicates > 0)
-            score += duplicates * duplicateLetterScore;
+            score += duplicates * _duplicateLetterScore;
 
         return score;
     }

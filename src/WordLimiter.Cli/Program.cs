@@ -58,7 +58,18 @@ public static class Program
             .ConfigureServices((context, serviceBuilder) =>
             {
                 serviceBuilder.AddInfrastructure();
-                serviceBuilder.AddCore();
+                serviceBuilder.AddCore(coreConfig =>
+                {
+                    coreConfig.Vowels = new char[] { 'a', 'e', 'i', 'o', 'u', 'y' };
+                    coreConfig.CommonLetters = new char[] { 'e', 't', 'a', 'i', 'o', 'n', 's', 'h', 'r' };
+                    coreConfig.CommonFirstLetters = new char[] { 't', 'a', 'o', 'd', 'w' };
+                    coreConfig.CommonLastLetters = new char[] { 'e', 's', 'd', 't' };
+                    coreConfig.VowelScore = 3;
+                    coreConfig.CommonLetterScore = 5;
+                    coreConfig.CommonFirstLetterScore = 7;
+                    coreConfig.CommonLastLetterScore = 7;
+                    coreConfig.DuplicateLetterScore = -10;
+                });
 
                 serviceBuilder.AddSingleton(args);
                 serviceBuilder.AddHostedService<WordLimiterHostedService>();
