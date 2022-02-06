@@ -9,15 +9,24 @@ namespace WordLimiter.Core;
 
 public static class _DependencyRegister
 {
-    public static IServiceCollection AddCore(this IServiceCollection services, Action<CoreOptions>? optionsConfigDelegate = default)
+    public static IServiceCollection AddCore(this IServiceCollection services, Action<CoreOptions>? optionsDelegate = default)
     {
         var coreOptions = new CoreOptions();
-        optionsConfigDelegate?.Invoke(coreOptions);
+        optionsDelegate?.Invoke(coreOptions);
 
         var assembly = Assembly.GetAssembly(typeof(_DependencyRegister)) ?? throw new Exception("This should literally not happen....");
 
         services.AddSingleton<IWordLimiterService, WordLimiterService>();
-        services.AddSingleton<IWordScoreService, WordScoreService>();
+        services.AddSingleton<IWordScoreService>(sp => new WordScoreService(
+            coreOptions.Vowels,
+            coreOptions.CommonLetters,
+            coreOptions.CommonFirstLetters,
+            coreOptions.CommonLastLetters,
+            coreOptions.VowelScore,
+            coreOptions.CommonLetterScore,
+            coreOptions.CommonFirstLetterScore,
+            coreOptions.CommonLastLetterScore,
+            coreOptions.DuplicateLetterScore));
         
         services.AddValidatorsFromAssembly(assembly);
         services.AddMediatR(assembly);
