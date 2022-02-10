@@ -76,6 +76,7 @@ public sealed class GetWordSuggestionsUseCase
                         confirmedCount++;
                         break;
                     case Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Wrong:
+                        letterSpecification.Indecies = new Dictionary<int, LetterSpecification.LetterSpecificationStatus>();
                         for(var i = 0; i < guess.GuessLetters.Count(); i++)
                             letterSpecification.Indecies.Add(i, LetterSpecification.LetterSpecificationStatus.Forbidden);
                         break;
