@@ -53,7 +53,7 @@ public sealed class GetWordSuggestionsUseCase
 
     private static IEnumerable<LetterSpecification> GetLetterSpecificationsFromRequest(Request request)
     {
-        var letterSpecifications = LetterSpecification.GetAllAllowed(request.WordLength);
+        var letterSpecifications = LetterSpecification.GetAllAllowed();
 
         foreach(var guess in request.Guesses)
             letterSpecifications = LimitLetterSpecificationsByGuess(letterSpecifications, guess);
@@ -63,31 +63,33 @@ public sealed class GetWordSuggestionsUseCase
 
     private static IEnumerable<LetterSpecification> LimitLetterSpecificationsByGuess(IEnumerable<LetterSpecification> letterSpecifications, Request.GuessDto guess)
     {
-        foreach(var guessLetter in guess.GuessLetters)
+        foreach(var letterSpecification in letterSpecifications)
         {
-            var letterSpecification = letterSpecifications.FirstOrDefault(ls => ls.Letter == guessLetter.Letter);
-            
-            if(letterSpecification == null)
-                continue;
-            
-            switch(guessLetter.Status)
+            var confirmedCount = 0;
+
+            foreach(var guessLetter in guess.GuessLetters.Where(e => e.Letter == letterSpecification.Letter))
             {
-                case Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Correct:
-                    var newRequiredIndecies = new List<int>(letterSpecification.RequiredIndecies);
-                    newRequiredIndecies.Add(guessLetter.Index);
-                    letterSpecification.RequiredIndecies = newRequiredIndecies;
-                    break;
-                case Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Misplaced:
-                    var newAllowedIndecies = new List<int>(letterSpecification.AllowedIndecies);
-                    newAllowedIndecies.Remove(guessLetter.Index);
-                    letterSpecification.AllowedIndecies = newAllowedIndecies;
-                    break;
-                case Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Wrong:
-                    letterSpecification.AllowedIndecies = letterSpecification.RequiredIndecies;
-                    break;
-                default:
-                    break;
+                switch(guessLetter.Status)
+                {
+                    case Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Correct:
+                        letterSpecification.Indecies[guessLetter.Index] = LetterSpecification.LetterSpecificationStatus.Required;
+                        confirmedCount++;
+                        break;
+                    case Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Wrong:
+                        for(var i = 0; i < guess.GuessLetters.Count(); i++)
+                            letterSpecification.Indecies.Add(i, LetterSpecification.LetterSpecificationStatus.Forbidden);
+                        break;
+                    case Request.GuessDto.GuessLetterDto.GuessLetterStatusEnum.Misplaced:
+                        letterSpecification.Indecies[guessLetter.Index] = LetterSpecification.LetterSpecificationStatus.Forbidden;
+                        confirmedCount++;
+                        break;
+                    default:
+                        break;
+                }
             }
+
+            if(letterSpecification.ConfirmedCount < confirmedCount)
+                letterSpecification.ConfirmedCount = confirmedCount;
         }
 
         return letterSpecifications;

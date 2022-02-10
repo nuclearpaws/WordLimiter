@@ -31,62 +31,75 @@ public class WordLimiterService
         var passingWords = new List<string>();
         foreach(var word in words)
         {
-            if(!WordPassesLetterOccurenceSpecification(
+            if(!WordPassesRequiredLetterCount(
                 word,
                 specification.Letter,
-                specification.MinOccurances,
-                specification.MaxOccurances))
+                specification.ConfirmedCount,
+                int.MaxValue))
                 continue;
 
-            if(!WordPassesRequiredIndeciesSpecification(
+            if(!WordPassesRequiredIndecies(
                 word,
                 specification.Letter,
-                specification.RequiredIndecies))
+                specification
+                    .Indecies
+                    .Where(e => e.Value == LetterSpecification.LetterSpecificationStatus.Required)
+                    .Select(e => e.Key)))
                 continue;
 
-            if(!WordPassesAllowedIndeciesSpecification(
+            if(!WordPassesForbiddenIndecies(
                 word,
                 specification.Letter,
-                specification.AllowedIndecies))
+                specification
+                    .Indecies
+                    .Where(e => e.Value == LetterSpecification.LetterSpecificationStatus.Forbidden)
+                    .Select(e => e.Key)))
                 continue;
-
+            
             passingWords.Add(word);
         }
         return passingWords;
     }
 
-    private static bool WordPassesLetterOccurenceSpecification(string word, char letter, int min, int? max)
+    private static bool WordPassesRequiredLetterCount(
+        string word,
+        char letter,
+        int minCount,
+        int maxCount)
     {
-        var occurances = word.Count(c => c == letter);
+        var wordLetterCount = word.Count(c => c == letter);
 
-        if(occurances < min)
+        if(wordLetterCount > maxCount)
             return false;
 
-        if(max != null && occurances > max)
+        if(wordLetterCount < minCount)
             return false;
 
         return true;
     }
 
-    private static bool WordPassesRequiredIndeciesSpecification(string word, char letter, IEnumerable<int> requiredIndecies)
+    private static bool WordPassesRequiredIndecies(
+        string word,
+        char letter,
+        IEnumerable<int> requiredIndecies)
     {
-        foreach(var index in requiredIndecies)
+        foreach(var requiredIndex in requiredIndecies)
         {
-            if(word[index] != letter)
+            if(word[requiredIndex] != letter)
                 return false;
         }
 
         return true;
     }
 
-    private static bool WordPassesAllowedIndeciesSpecification(string word, char letter, IEnumerable<int> allowedIndecies)
+    private static bool WordPassesForbiddenIndecies(
+        string word,
+        char letter,
+        IEnumerable<int> forbiddenIndecies)
     {
-        if(!allowedIndecies.Any() && word.Contains(letter))
-            return false;
-
-        for(var i = 0; i < word.Length; i++)
+        foreach(var forbiddenIndex in forbiddenIndecies)
         {
-            if(word[i] == letter && !allowedIndecies.Contains(i))
+            if(word[forbiddenIndex] == letter)
                 return false;
         }
 
